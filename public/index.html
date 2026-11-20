@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>All Social Media Downloader — Free Version v1.0.0</title>
+<style>
+  :root{
+    --bg:#060814; --card:rgba(255,255,255,.06); --line:rgba(255,255,255,.12);
+    --text:#eef1ff; --muted:#9aa3c7; --a:#7c5cff; --b:#00d4ff; --c:#ff4fa3;
+    --accent:#ff2d2d; /* changes per platform */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;background:radial-gradient(1200px 700px at 50% -10%,#16194a 0%,var(--bg) 60%);
+    color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+  #fx{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+  /* ---------- Orbs ---------- */
+  .orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+  .orb{position:absolute;border-radius:50%;filter:blur(60px);opacity:.5;animation:float 18s ease-in-out infinite;transition:background 1s}
+  .o1{width:440px;height:440px;background:var(--accent);top:-120px;left:-90px}
+  .o2{width:360px;height:360px;background:var(--b);bottom:-120px;right:-60px;animation-delay:-6s}
+  .o3{width:300px;height:300px;background:var(--c);top:42%;left:58%;animation-delay:-11s}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(60px,40px) scale(1.15)}66%{transform:translate(-40px,70px) scale(.9)}}
+  body.fetching .orb{animation:converge 2.2s ease-in-out infinite;opacity:.85}
+  body.fetching .o1{--x:36vw;--y:40vh}
+  body.fetching .o2{--x:-32vw;--y:-34vh}
+  body.fetching .o3{--x:-12vw;--y:12vh}
+  @keyframes converge{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(var(--x),var(--y)) scale(1.3)}}
+
+  /* ---------- Layout ---------- */
+  main{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:40px 20px 70px}
+  header{text-align:center;margin-bottom:26px;position:relative}
+  .logo{width:84px;height:84px;margin:0 auto 14px;border-radius:26px;display:grid;place-items:center;font-size:40px;
+    background:linear-gradient(135deg,var(--a),var(--b),var(--c));background-size:200% 200%;animation:shift 6s ease infinite,bob 4s ease-in-out infinite;
+    box-shadow:0 14px 50px rgba(124,92,255,.55)}
+  @keyframes shift{50%{background-position:100% 100%}}
+  @keyframes bob{50%{transform:translateY(-8px) rotate(-3deg)}}
+  h1{font-size:clamp(1.9rem,5.5vw,3rem);margin:0 0 8px;line-height:1.1;
+    background:linear-gradient(90deg,var(--a),var(--b),var(--c),var(--a));background-size:300% 100%;animation:grad 8s linear infinite;
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  @keyframes grad{to{background-position:300% 0}}
+  .badge{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;border:1px solid var(--line);border-radius:999px;font-size:.8rem;color:var(--muted);background:var(--card)}
+  .badge b{width:8px;height:8px;border-radius:50%;background:#37e08a;box-shadow:0 0 10px #37e08a;animation:pulse 1.6s infinite}
+  @keyframes pulse{50%{opacity:.35;transform:scale(1.4)}}
+  .sub{color:var(--muted);margin:12px 0 0}
+
+  /* floating platform bubbles */
+  .bubbles{position:absolute;inset:0;pointer-events:none}
+  .bubbles span{position:absolute;font-size:22px;opacity:.7;animation:drift 9s ease-in-out infinite}
+  @keyframes drift{50%{transform:translateY(-16px) rotate(8deg)}}
+
+  /* ---------- Panel with spinning gradient border ---------- */
+  .panel{position:relative;border-radius:24px;padding:2px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.45)}
+  .panel::before{content:"";position:absolute;inset:-60%;background:conic-gradient(from 0deg,transparent 0 60%,var(--accent),var(--b),var(--c),transparent);animation:spin 6s linear infinite}
+  body.fetching .panel::before{animation-duration:1.4s}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .inner{position:relative;border-radius:22px;padding:22px;background:rgba(11,14,36,.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 10px;margin-bottom:12px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab{flex:0 0 auto;padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--muted);
+    cursor:pointer;font-size:.92rem;font-weight:700;transition:.25s;position:relative;overflow:hidden}
+  .tab:hover{color:var(--text);transform:translateY(-2px)}
+  .tab.active{color:#fff;border-color:transparent;background:var(--tabc);box-shadow:0 8px 26px var(--tabg)}
+  .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.45);transform:scale(0);animation:rip .6s ease-out;pointer-events:none}
+  @keyframes rip{to{transform:scale(4);opacity:0}}
+
+  /* ---------- Input ---------- */
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .field{position:relative;flex:1 1 260px}
+  input{width:100%;padding:16px 92px 16px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text);font-size:1rem;outline:none;transition:.2s}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}
+  .mini{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:1px solid var(--line);background:var(--card);color:var(--text);
+    padding:7px 12px;border-radius:10px;cursor:pointer;font-size:.8rem;font-weight:600}
+  .mini:hover{background:rgba(255,255,255,.12)}
+  .btn{padding:16px 26px;border:0;border-radius:14px;font-size:1rem;font-weight:800;color:#fff;cursor:pointer;
+    background:linear-gradient(135deg,var(--a),var(--c));transition:.2s;position:relative;overflow:hidden}
+  .btn::after{content:"";position:absolute;top:0;left:-120%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-20deg);animation:shine 3s infinite}
+  @keyframes shine{60%,100%{left:160%}}
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.12)}
+  .btn:disabled{opacity:.65;cursor:wait;transform:none}
+
+  /* ---------- Fetch loader ---------- */
+  .loader{display:none;flex-direction:column;align-items:center;gap:14px;padding:30px 0 6px}
+  body.fetching .loader{display:flex}
+  .spinner{position:relative;width:100px;height:100px}
+  .spinner .core{position:absolute;inset:0;margin:auto;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle,#fff,var(--accent));box-shadow:0 0 30px var(--accent);animation:pulse 1.2s infinite}
+  .spinner i{position:absolute;inset:0;margin:auto;width:16px;height:16px;border-radius:50%;background:var(--b);box-shadow:0 0 18px var(--b);animation:orbit 1.7s linear infinite}
+  .spinner i:nth-of-type(2){background:var(--a);box-shadow:0 0 18px var(--a);animation-delay:-.43s}
+  .spinner i:nth-of-type(3){background:var(--c);box-shadow:0 0 18px var(--c);animation-delay:-.85s}
+  .spinner i:nth-of-type(4){background:#fff;box-shadow:0 0 18px #fff;animation-delay:-1.27s;width:9px;height:9px}
+  @keyframes orbit{from{transform:rotate(0) translateX(42px)}50%{transform:rotate(180deg) translateX(24px) scale(.7)}to{transform:rotate(360deg) translateX(42px)}}
+  .bar{width:min(340px,80%);height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+  .bar div{height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--a),var(--b),var(--c));transition:width .6s ease;box-shadow:0 0 14px var(--b)}
+  .status{color:var(--muted);font-size:.95rem;min-height:1.4em}
+
+  /* ---------- Result ---------- */
+  .result{display:none;margin-top:22px;gap:18px;flex-wrap:wrap;padding:16px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.04);animation:pop .5s cubic-bezier(.2,1.3,.4,1)}
+  .result.show{display:flex}
+  @keyframes pop{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
+  .thumbwrap{position:relative;width:240px;max-width:100%;aspect-ratio:16/9;border-radius:14px;overflow:hidden;background:#12162e;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .thumbwrap::before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);animation:shim 1.6s infinite}
+  @keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .thumbwrap img{position:relative;width:100%;height:100%;object-fit:cover;display:block}
+  .play{position:absolute;inset:0;margin:auto;width:52px;height:52px;border-radius:50%;background:rgba(0,0,0,.55);display:grid;place-items:center;font-size:20px;border:1px solid rgba(255,255,255,.4)}
+  .dur{position:absolute;right:8px;bottom:8px;background:rgba(0,0,0,.75);padding:2px 8px;border-radius:8px;font-size:.75rem;font-weight:700}
+  .meta{flex:1 1 240px;min-width:0}
+  .meta h3{margin:0 0 6px;font-size:1.08rem;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .meta p{margin:0 0 14px;color:var(--muted);font-size:.88rem}
+  .dl{display:flex;gap:10px;flex-wrap:wrap}
+  .dl a{flex:1 1 150px;text-align:center;text-decoration:none;padding:14px 16px;border-radius:14px;font-weight:800;color:#fff;transition:.2s}
+  .dl a small{display:block;font-weight:500;opacity:.85;font-size:.75rem;margin-top:3px}
+  .dl .normal{background:linear-gradient(135deg,#2b3566,#3b4a8f);border:1px solid var(--line)}
+  .dl .hd{background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 8px 26px rgba(124,92,255,.45)}
+  .dl a:hover{transform:translateY(-3px) scale(1.02)}
+
+  .error{display:none;margin-top:16px;padding:12px 14px;border-radius:12px;background:rgba(255,79,100,.12);border:1px solid rgba(255,79,100,.4);color:#ffb3bd;font-size:.92rem;animation:shake .4s}
+  .error.show{display:block}
+  @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+  /* feature chips */
+  .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:22px}
+  .chips span{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:.82rem;color:var(--muted)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,120px);z-index:5;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:14px;
+    background:rgba(20,26,60,.95);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.5);transition:.4s cubic-bezier(.2,1.3,.4,1);font-weight:600}
+  .toast.show{transform:translate(-50%,0)}
+  .toast .ok{width:24px;height:24px;border-radius:50%;background:#37e08a;color:#062;display:grid;place-items:center;font-weight:900}
+
+  footer{text-align:center;color:var(--muted);font-size:.8rem;margin-top:26px;line-height:1.7}
+  canvas#confetti{position:fixed;inset:0;z-index:6;pointer-events:none}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="orbs"><div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div></div>
+<canvas id="confetti"></canvas>
+
+<main>
+  <header>
+    <div class="bubbles">
+      <span style="left:4%;top:10%">▶️</span><span style="left:90%;top:4%;animation-delay:-2s">🎵</span>
+      <span style="left:10%;top:70%;animation-delay:-4s">📘</span><span style="left:86%;top:62%;animation-delay:-6s">📸</span>
+    </div>
+    <div class="logo">⬇</div>
+    <h1>All Social Media Downloader</h1>
+    <span class="badge"><b></b>Free Version v1.0.0</span>
+    <p class="sub">Pick a platform, paste the link, choose your quality.</p>
+  </header>
+
+  <section class="panel"><div class="inner">
+    <nav class="tabs" id="tabs"></nav>
+
+    <form class="row" id="form">
+      <div class="field">
+        <input id="url" type="url" placeholder="Paste video link here…" autocomplete="off" required>
+        <button type="button" class="mini" id="paste">Paste</button>
+      </div>
+      <button class="btn" id="go" type="submit">Fetch Video</button>
+    </form>
+
+    <div class="loader">
+      <div class="spinner"><div class="core"></div><i></i><i></i><i></i><i></i></div>
+      <div class="bar"><div id="prog"></div></div>
+      <div class="status" id="status">Connecting…</div>
+    </div>
+
+    <div class="error" id="error"></div>
+
+    <div class="result" id="result">
+      <div class="thumbwrap">
+        <img id="thumb" alt="Video thumbnail">
+        <div class="play">▶</div><div class="dur" id="dur"></div>
+      </div>
+      <div class="meta">
+        <h3 id="title"></h3>
+        <p id="byline"></p>
+        <div class="dl">
+          <a class="normal" id="dlNormal" href="#">⬇ Normal Quality<small id="szNormal"></small></a>
+          <a class="hd" id="dlHD" href="#">⬇ HD Quality<small id="szHD"></small></a>
+        </div>
+      </div>
+    </div>
+  </div></section>
+
+  <div class="chips"><span>⚡ Fast fetch</span><span>🎞 Normal &amp; HD</span><span>🔒 No sign-up</span><span>📱 Works on any device</span></div>
+
+  <footer>
+    All Social Media Downloader · Free Version v1.0.0<br>
+    Only download content you own or have permission to save.
+  </footer>
+</main>
+
+<div class="toast" id="toast"><div class="ok">✓</div><span id="toastText">Download started</span></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ---------- Platforms (each with its own colour theme) ---------- */
+const PLATFORMS = [
+  ["youtube","▶ YouTube","#ff2d2d","#ff6a3d"],
+  ["facebook","f Facebook","#1877f2","#4aa3ff"],
+  ["tiktok","♪ TikTok","#ff0050","#00f2ea"],
+  ["instagram","◎ Instagram","#c13584","#fd8d32"],
+  ["twitter","𝕏 Twitter/X","#1d9bf0","#6bc4ff"],
+  ["reddit","Reddit","#ff4500","#ff8b5e"],
+  ["vimeo","Vimeo","#1ab7ea","#5fd4ff"],
+  ["pinterest","Pinterest","#e60023","#ff6b81"]
+];
+let platform = "youtube";
+const root = document.documentElement;
+
+function applyTheme(p){
+  root.style.setProperty("--accent", p[2]);
+  document.querySelectorAll(".tab").forEach(t=>{
+    if(t.dataset.id===p[0]){
+      t.style.setProperty("--tabc",`linear-gradient(135deg,${p[2]},${p[3]})`);
+      t.style.setProperty("--tabg",p[2]+"88");
+    }
+  });
+}
+
+PLATFORMS.forEach(p => {
+  const b = document.createElement("button");
+  b.type="button"; b.className="tab"+(p[0]===platform?" active":""); b.textContent=p[1]; b.dataset.id=p[0];
+  b.onclick = e => {
+    const r=document.createElement("span"); r.className="ripple";
+    const rect=b.getBoundingClientRect(); const s=Math.max(rect.width,rect.height);
+    r.style.cssText=`width:${s}px;height:${s}px;left:${e.clientX-rect.left-s/2}px;top:${e.clientY-rect.top-s/2}px`;
+    b.appendChild(r); setTimeout(()=>r.remove(),600);
+    platform=p[0];
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    b.classList.add("active"); applyTheme(p);
+    $("url").placeholder=`Paste ${p[1].replace(/^\S+\s/,"")} link here…`;
+    $("result").classList.remove("show"); $("error").classList.remove("show");
+  };
+  $("tabs").appendChild(b);
+});
+applyTheme(PLATFORMS[0]);
+
+/* ---------- Paste button ---------- */
+$("paste").onclick = async () => {
+  try{ $("url").value = await navigator.clipboard.readText(); $("url").focus(); }
+  catch{ toast("Press Ctrl/Cmd+V to paste",false); }
+};
+
+/* ---------- Particle network background ---------- */
+(function(){
+  const c=$("fx"), x=c.getContext("2d"); let W,H,pts=[],mouse={x:-999,y:-999};
+  function size(){W=c.width=innerWidth;H=c.height=innerHeight;pts=Array.from({length:Math.min(90,Math.floor(W*H/16000))},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.4,vy:(Math.random()-.5)*.4,r:Math.random()*1.8+.6}))}
+  addEventListener("resize",size); addEventListener("mousemove",e=>{mouse.x=e.clientX;mouse.y=e.clientY}); size();
+  (function loop(){
+    x.clearRect(0,0,W,H);
+    const fast=document.body.classList.contains("fetching")?2.6:1;
+    for(const p of pts){
+      p.x+=p.vx*fast;p.y+=p.vy*fast;
+      if(p.x<0||p.x>W)p.vx*=-1; if(p.y<0||p.y>H)p.vy*=-1;
+      x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fillStyle="rgba(190,200,255,.7)";x.fill();
+    }
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);
+      if(d<120){x.strokeStyle=`rgba(124,92,255,${.22*(1-d/120)})`;x.beginPath();x.moveTo(pts[i].x,pts[i].y);x.lineTo(pts[j].x,pts[j].y);x.stroke()}
+    }
+    for(const p of pts){const d=Math.hypot(p.x-mouse.x,p.y-mouse.y);
+      if(d<150){x.strokeStyle=`rgba(0,212,255,${.5*(1-d/150)})`;x.beginPath();x.moveTo(p.x,p.y);x.lineTo(mouse.x,mouse.y);x.stroke()}}
+    requestAnimationFrame(loop);
+  })();
+})();
+
+/* ---------- Confetti ---------- */
+function confetti(){
+  const c=$("confetti"),x=c.getContext("2d");c.width=innerWidth;c.height=innerHeight;
+  const cols=["#7c5cff","#00d4ff","#ff4fa3","#37e08a","#ffd24a"];
+  const ps=Array.from({length:110},()=>({x:innerWidth/2,y:innerHeight*.55,vx:(Math.random()-.5)*14,vy:-Math.random()*13-3,s:Math.random()*7+3,c:cols[Math.random()*5|0],a:Math.random()*6,va:(Math.random()-.5)*.4,l:1}));
+  (function f(){
+    x.clearRect(0,0,c.width,c.height);let alive=false;
+    for(const p of ps){p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.a+=p.va;p.l-=.012;if(p.l>0){alive=true;
+      x.save();x.globalAlpha=Math.max(p.l,0);x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);x.restore()}}
+    if(alive)requestAnimationFrame(f);else x.clearRect(0,0,c.width,c.height);
+  })();
+}
+
+/* ---------- Toast ---------- */
+let tt;function toast(msg,ok=true){$("toastText").textContent=msg;$("toast").classList.add("show");clearTimeout(tt);tt=setTimeout(()=>$("toast").classList.remove("show"),2800)}
+
+/* ---------- Fetch flow ---------- */
+const steps=[["Connecting…",15],["Locating video…",40],["Reading formats…",68],["Preparing download links…",88]];
+let stepTimer;
+function startLoading(){
+  document.body.classList.add("fetching");$("go").disabled=true;
+  $("result").classList.remove("show");$("error").classList.remove("show");
+  let i=0;$("status").textContent=steps[0][0];$("prog").style.width=steps[0][1]+"%";
+  stepTimer=setInterval(()=>{i=Math.min(i+1,steps.length-1);$("status").textContent=steps[i][0];$("prog").style.width=steps[i][1]+"%"},1400);
+}
+function stopLoading(){
+  clearInterval(stepTimer);$("prog").style.width="100%";
+  setTimeout(()=>{document.body.classList.remove("fetching");$("go").disabled=false;$("prog").style.width="0"},350);
+}
+function showError(m){const e=$("error");e.classList.remove("show");void e.offsetWidth;e.textContent=m;e.classList.add("show")}
+const fmt=q=>q?[q.height?q.height+"p":null,q.size].filter(Boolean).join(" · "):"";
+
+$("form").addEventListener("submit",async ev=>{
+  ev.preventDefault();
+  const url=$("url").value.trim();
+  startLoading();
+  try{
+    const r=await fetch(`/api/info?platform=${platform}&url=${encodeURIComponent(url)}`);
+    const data=await r.json();
+    if(!data.ok)throw new Error(data.error||"Could not fetch that video.");
+    $("thumb").src=data.thumbnail||"";
+    $("title").textContent=data.title||"Untitled video";
+    const d=data.duration;
+    $("dur").textContent=d?`${Math.floor(d/60)}:${String(Math.floor(d%60)).padStart(2,"0")}`:"";
+    $("dur").style.display=d?"block":"none";
+    $("byline").textContent=data.uploader||"";
+    const base=`/api/download?platform=${platform}&url=${encodeURIComponent(url)}&quality=`;
+    $("dlNormal").href=base+"normal";$("dlHD").href=base+"hd";
+    $("szNormal").textContent=fmt(data.qualities.normal);
+    $("szHD").textContent=fmt(data.qualities.hd);
+    $("result").classList.add("show");
+    confetti();toast("Video found — choose a quality");
+  }catch(err){showError(err.message)}
+  finally{stopLoading()}
+});
+
+["dlNormal","dlHD"].forEach(id=>$(id).addEventListener("click",()=>{
+  toast("Download started — check your downloads");confetti();
+}));
+</script>
+</body>
+</html>
