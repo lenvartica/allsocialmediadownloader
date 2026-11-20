@@ -23,11 +23,13 @@ PLATFORMS = {
     "pinterest": ["pinterest.com", "pin.it"],
 }
 
-# No ffmpeg on Vercel, so only pick single-file (audio+video) formats.
+# No ffmpeg on Vercel, so only pick single-file (audio+video) HTTP formats.
+# "<=?" also accepts formats whose height is unknown; [protocol^=http] skips HLS/DASH.
 QUALITY = {
-    "normal": "best[height<=480]/worst",
-    "hd": "best[height<=1080]/best",
+    "normal": "best[height<=?480][protocol^=http]/worst[protocol^=http]",
+    "hd": "best[height<=?1080][protocol^=http]/best[protocol^=http]",
 }
+LIST_FORMAT = "best/bestvideo*/worst"
 
 COOKIE_PATH = "/tmp/yt_cookies.txt"
 
@@ -38,6 +40,8 @@ class DownloaderError(Exception):
 
 def validate(url: str, platform: str) -> str:
     url = (url or "").strip()
+    if len(url) > 2000:
+        raise DownloaderError("That link is too long.")
     if not re.match(r"^https?://", url, re.I):
         raise DownloaderError("Please paste a full link starting with https://")
     host = (urlparse(url).hostname or "").lower()
@@ -49,13 +53,14 @@ def validate(url: str, platform: str) -> str:
     return url
 
 
-def _options(quality: str) -> dict:
+def _options(fmt: str) -> dict:
     opts = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
         "skip_download": True,
-        "format": QUALITY.get(quality, QUALITY["normal"]),
+        "format": fmt,
+        "ignore_no_formats_error": True,
         "socket_timeout": 15,
         "retries": 2,
         "geo_bypass": True,
@@ -82,7 +87,7 @@ def _is_facebook(url: str) -> bool:
 def _facebook_candidates(url: str) -> list:
     """Same video, different URL shapes. yt-dlp's parser works on some and not others."""
     out = [url]
-    m = re.search(r"(?:/videos/(?:[^/?#]+/)?|[?&]v=|/reel/|/watch/\?v=)(\d{6,})", url)
+    m = re.search(r"(?:/videos/(?:[^/?#]+/)?|[?&]v=|/reel/)(\d{6,})", url)
     if m:
         vid = m.group(1)
         out += [
@@ -113,22 +118,68 @@ def _friendly(msg: str, facebook: bool) -> str:
         return "That link isn't a direct video link. Open the video itself and copy its link."
     if "429" in low or "too many requests" in low:
         return "Too many requests. Please wait a minute and try again."
-    return msg[:300]
+    return (msg or "Could not fetch that video.")[:300]
 
 
-def extract(url: str, quality: str = "normal") -> dict:
+def _run(url: str, fmt: str) -> dict:
     facebook = _is_facebook(url)
     candidates = _facebook_candidates(url) if facebook else [url]
     last_err = ""
     for candidate in candidates:
         try:
-            with yt_dlp.YoutubeDL(_options(quality)) as ydl:
-                return ydl.extract_info(candidate, download=False)
+            with yt_dlp.YoutubeDL(_options(fmt)) as ydl:
+                info = ydl.extract_info(candidate, download=False)
+            if info:
+                if info.get("entries"):
+                    entries = list(info["entries"])
+                    info = entries[0] if entries else None
+                if info:
+                    return info
+            last_err = "No video found at that link."
         except yt_dlp.utils.DownloadError as e:
             last_err = re.sub(r"\x1b\[[0-9;]*m", "", str(e)).replace("ERROR: ", "")
         except Exception as e:  # parser crashes etc.
             last_err = str(e)
     raise DownloaderError(_friendly(last_err, facebook))
+
+
+def extract(url: str, quality: str = "normal") -> dict:
+    """Resolve one downloadable single-file format for the chosen quality."""
+    return _run(url, QUALITY.get(quality, QUALITY["normal"]))
+
+
+def extract_formats(url: str) -> dict:
+    """One extraction that returns every format, so /api/info needs only one network round trip."""
+    return _run(url, LIST_FORMAT)
+
+
+def _size(f):
+    return f.get("filesize") or f.get("filesize_approx")
+
+
+def pick_formats(info: dict) -> dict:
+    """Choose the normal/HD single-file HTTP formats from an extraction result."""
+    fmts = [
+        f for f in (info.get("formats") or [])
+        if f.get("vcodec") != "none" and f.get("acodec") != "none"
+        and str(f.get("protocol", "")).startswith("http") and f.get("url")
+    ]
+    if not fmts and info.get("url") and str(info.get("protocol", "")).startswith("http"):
+        fmts = [info]  # extractors that return a single format (TikTok, Twitter, ...)
+
+    def h(f):
+        return f.get("height") or 0
+
+    out = {"normal": None, "hd": None}
+    if fmts:
+        small = [f for f in fmts if h(f) <= 480]
+        out["normal"] = max(small, key=h) if small else min(fmts, key=h)
+        hd = [f for f in fmts if h(f) <= 1080]
+        out["hd"] = max(hd, key=h) if hd else min(fmts, key=h)
+    return {
+        k: ({"height": v.get("height"), "ext": v.get("ext"), "size": _size(v)} if v else None)
+        for k, v in out.items()
+    }
 
 
 def safe_filename(title: str, ext: str) -> str:

@@ -84,7 +84,6 @@
 <!-- Performance -->
 <link rel="dns-prefetch" href="//connect.facebook.net">
 <link rel="dns-prefetch" href="//www.googletagmanager.com">
-<link rel="preload" href="/og-image.png" as="image" fetchpriority="low">
 
 <!-- Structured data -->
 <script type="application/ld+json">
@@ -184,7 +183,8 @@
   .row{display:flex;gap:10px;flex-wrap:wrap}
   .field{position:relative;flex:1 1 260px}
   input{width:100%;padding:16px 92px 16px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--text);font-size:1rem;outline:none;transition:.2s}
-  input:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(124,92,255,.25)}
+  @supports (color:color-mix(in srgb,red,blue)){input:focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}}
   .mini{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:1px solid var(--line);background:var(--card);color:var(--text);
     padding:7px 12px;border-radius:10px;cursor:pointer;font-size:.8rem;font-weight:600}
   .mini:hover{background:rgba(255,255,255,.12)}
@@ -232,6 +232,11 @@
   .error{display:none;margin-top:16px;padding:12px 14px;border-radius:12px;background:rgba(255,79,100,.12);border:1px solid rgba(255,79,100,.4);color:#ffb3bd;font-size:.92rem;animation:shake .4s}
   .error.show{display:block}
   @keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+  .copyrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .copyrow button{flex:1 1 150px;padding:9px 12px;border-radius:12px;border:1px dashed var(--line);background:transparent;color:var(--muted);cursor:pointer;font-size:.8rem;font-weight:600;transition:.2s}
+  .copyrow button:hover{color:var(--text);border-color:var(--b)}
+  .hint{margin:8px 0 0;font-size:.76rem;color:var(--muted);line-height:1.5}
 
   /* feature chips */
   .chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:22px}
@@ -286,7 +291,7 @@
 
     <div class="result" id="result">
       <div class="thumbwrap">
-        <img id="thumb" alt="Video thumbnail">
+        <img id="thumb" alt="Video thumbnail" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">
         <div class="play">▶</div><div class="dur" id="dur"></div>
       </div>
       <div class="meta">
@@ -296,6 +301,11 @@
           <a class="normal" id="dlNormal" href="#">⬇ Normal Quality<small id="szNormal"></small></a>
           <a class="hd" id="dlHD" href="#">⬇ HD Quality<small id="szHD"></small></a>
         </div>
+        <div class="copyrow">
+          <button type="button" data-copy="dlNormal">🔗 Copy Normal link</button>
+          <button type="button" data-copy="dlHD">🔗 Copy HD link</button>
+        </div>
+        <p class="hint">Using IDM, Free Download Manager, JDownloader or ADM? Copy the link and add it as a new download. Resume and multi-connection are supported.</p>
       </div>
     </div>
   </div></section>
@@ -328,6 +338,7 @@ const PLATFORMS = [
   ["pinterest","Pinterest","#e60023","#ff6b81"]
 ];
 let platform = "youtube";
+let reqId = 0;
 const root = document.documentElement;
 
 function applyTheme(p){
@@ -348,7 +359,7 @@ PLATFORMS.forEach(p => {
     const rect=b.getBoundingClientRect(); const s=Math.max(rect.width,rect.height);
     r.style.cssText=`width:${s}px;height:${s}px;left:${e.clientX-rect.left-s/2}px;top:${e.clientY-rect.top-s/2}px`;
     b.appendChild(r); setTimeout(()=>r.remove(),600);
-    platform=p[0];
+    platform=p[0]; reqId++; stopLoading();
     document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
     b.classList.add("active"); applyTheme(p);
     $("url").placeholder=`Paste ${p[1].replace(/^\S+\s/,"")} link here…`;
@@ -422,10 +433,13 @@ const fmt=q=>q?[q.height?q.height+"p":null,q.size].filter(Boolean).join(" · "):
 $("form").addEventListener("submit",async ev=>{
   ev.preventDefault();
   const url=$("url").value.trim();
+  const myReq=++reqId, myPlatform=platform;
   startLoading();
   try{
-    const r=await fetch(`/api/info?platform=${platform}&url=${encodeURIComponent(url)}`);
-    const data=await r.json();
+    const r=await fetch(`/api/info?platform=${myPlatform}&url=${encodeURIComponent(url)}`);
+    let data;
+    try{data=await r.json()}catch{throw new Error("The server took too long or failed. Please try again.")}
+    if(myReq!==reqId)return;
     if(!data.ok)throw new Error(data.error||"Could not fetch that video.");
     $("thumb").src=data.thumbnail||"";
     $("title").textContent=data.title||"Untitled video";
@@ -433,19 +447,33 @@ $("form").addEventListener("submit",async ev=>{
     $("dur").textContent=d?`${Math.floor(d/60)}:${String(Math.floor(d%60)).padStart(2,"0")}`:"";
     $("dur").style.display=d?"block":"none";
     $("byline").textContent=data.uploader||"";
-    const base=`/api/download?platform=${platform}&url=${encodeURIComponent(url)}&quality=`;
+    $("thumb").style.visibility="visible";
+    const base=`/api/download?platform=${myPlatform}&url=${encodeURIComponent(url)}&quality=`;
     $("dlNormal").href=base+"normal";$("dlHD").href=base+"hd";
     $("szNormal").textContent=fmt(data.qualities.normal);
     $("szHD").textContent=fmt(data.qualities.hd);
     $("result").classList.add("show");
     confetti();toast("Video found — choose a quality");
-  }catch(err){showError(err.message)}
-  finally{stopLoading()}
+  }catch(err){if(myReq===reqId)showError(err.message)}
+  finally{if(myReq===reqId)stopLoading()}
 });
 
 ["dlNormal","dlHD"].forEach(id=>$(id).addEventListener("click",()=>{
-  toast("Download started — check your downloads");confetti();
+  toast("Starting download… if it fails, the reason will show here");
 }));
+
+/* Copy link for download managers (IDM, FDM, JDownloader, ADM) */
+document.querySelectorAll("[data-copy]").forEach(b=>b.addEventListener("click",async()=>{
+  const link=$(b.dataset.copy).href;
+  try{await navigator.clipboard.writeText(link);toast("Link copied — paste it into your download manager")}
+  catch{window.prompt("Copy this link:",link)}
+}));
+
+/* Errors sent back from /api/download (browser navigation) */
+(function(){
+  const qe=new URLSearchParams(location.search).get("error");
+  if(qe){showError(qe);history.replaceState(null,"",location.pathname)}
+})();
 </script>
 </body>
 </html>

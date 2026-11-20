@@ -46,3 +46,13 @@ or push to GitHub and import the repo in Vercel.
 - `public/sitemap.xml`, `robots.txt`, `site.webmanifest`, `browserconfig.xml`, `humans.txt`, `.well-known/security.txt`.
 - **Replace** `https://allsocialmediadownloader.vercel.app` everywhere with your real domain (search & replace).
 - Pixels: put your IDs in `public/config.js` (Meta Pixel, GA4, TikTok, Clarity). Empty = off.
+
+## Optional environment variables (Vercel > Settings > Environment Variables)
+- `YTDLP_PROXY` — residential proxy URL; fixes most "blocked" / "Cannot parse data" errors on Facebook, YouTube, Instagram.
+- `YTDLP_COOKIES` — contents of a Netscape-format `cookies.txt` exported from a logged-in browser (use a throwaway account).
+- After changing dependencies, use **Redeploy → without build cache** so the newest `yt-dlp` is installed.
+
+## Download managers (IDM, FDM, JDownloader, ADM)
+`/api/download` supports `HEAD` and `Range` requests, so managers can resume and use multiple connections.
+Use the **Copy link** buttons on the result card and add the link as a new download, or let the manager's
+browser integration catch the normal download button.
