@@ -1,0 +1,8 @@
+/* TEAM */
+Project: All Social Media Downloader — Free Version v1.0.0
+
+/* SITE */
+Last update: 2026/11/21
+Standards: HTML5, CSS3, ES2020
+Backend: Python, Flask, yt-dlp
+Hosting: Vercel

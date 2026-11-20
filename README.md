@@ -4,12 +4,11 @@ Tabbed web app (YouTube, Facebook, TikTok, Instagram, Twitter/X, Reddit, Vimeo, 
 Paste a link → fetch → download in Normal or HD quality.
 
 - **Frontend:** `public/index.html` (plain HTML/CSS/JS, animated orbs)
-- **Backend:** Python serverless functions on Vercel (`api/info.py`, `api/download.py`) using `yt-dlp`
+- **Backend:** Flask (`app.py`) on Vercel's Python runtime using `yt-dlp`
 
 ## Structure
 ```
-api/info.py        # returns title, thumbnail, available qualities
-api/download.py    # streams the file to the browser as an attachment
+app.py             # Flask app: /api/info, /api/download, /api/health (Vercel entrypoint)
 lib/extractor.py   # yt-dlp wrapper + per-platform domain allowlist
 public/index.html  # UI
 requirements.txt
@@ -18,9 +17,9 @@ vercel.json
 
 ## Run locally
 ```
-pip install yt-dlp
-npm i -g vercel
-vercel dev
+pip install -r requirements.txt
+python app.py        # API on http://localhost:3000
+# or: npm i -g vercel && vercel dev
 ```
 
 ## Deploy
@@ -40,3 +39,10 @@ or push to GitHub and import the repo in Vercel.
    longer needs a paid plan). Big files may be cut off. For large videos, use a VPS backend.
 4. **yt-dlp goes stale.** Platforms change often; redeploy regularly to pick up the newest yt-dlp.
 5. Respect copyright and each platform's terms. Download only content you own or have permission to save.
+
+## SEO / meta / tracking
+- `public/index.html` head: charset, viewport, description, robots, canonical, Open Graph (Facebook/Instagram/WhatsApp),
+  Twitter/X card, Apple/Android/Windows meta, favicons, manifest, JSON-LD.
+- `public/sitemap.xml`, `robots.txt`, `site.webmanifest`, `browserconfig.xml`, `humans.txt`, `.well-known/security.txt`.
+- **Replace** `https://allsocialmediadownloader.vercel.app` everywhere with your real domain (search & replace).
+- Pixels: put your IDs in `public/config.js` (Meta Pixel, GA4, TikTok, Clarity). Empty = off.
